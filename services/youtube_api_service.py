@@ -1,11 +1,12 @@
+from datetime import datetime, timezone
+import logging
+import os
+import pickle
+
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from datetime import datetime, timezone
-import os
-import pickle
-import logging
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,15 +26,19 @@ class YouTubeAPIService:
 
         if not self.credentials or not self.credentials.valid:
             if self.credentials and self.credentials.expired and self.credentials.refresh_token:
-                self.credentials.refresh(Request())
-            else:
+                try:
+                    self.credentials.refresh(Request())
+                except Exception as e:  # Catch any exception during refresh
+                    logger.warning(f"Token refresh failed: {e}. Re-authenticating...")
+                    self.credentials = None  # Reset credentials to force re-authentication
+            if not self.credentials:  # If credentials are None or invalid
                 flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, SCOPES)
                 self.credentials = flow.run_local_server(port=0)
 
             with open('token.pickle', 'wb') as token:
                 pickle.dump(self.credentials, token)
 
-        return build('youtube', 'v3', credentials=self.credentials)
+        return build('youtube', 'v3', credentials=self.credentials, cache_discovery=False)
 
     def get_playlist_details(self, playlist_id):
         request = self.youtube.playlists().list(
@@ -113,6 +118,7 @@ class YouTubeAPIService:
     def update_playlist(self, db, playlist_id):
         playlist_details = self.get_playlist_details(playlist_id)
         if playlist_details:
+            old_hash = db.get_playlist_hash(playlist_id)
             new_hash = db.update_playlist(
                 playlist_id,
                 playlist_details['title'],
@@ -121,7 +127,6 @@ class YouTubeAPIService:
                 playlist_details['channel_title'],
                 playlist_details['item_count']
             )
-            old_hash = db.get_playlist_hash(playlist_id)
             return new_hash != old_hash
         return False
 
@@ -131,6 +136,7 @@ class YouTubeAPIService:
         for item in playlist_items:
             if item is None:  # Skip if item is None
                 continue
+            old_hash = db.get_video_hash(item['id'])
             new_hash = db.update_video(
                 item['id'],
                 playlist_id,
@@ -144,7 +150,6 @@ class YouTubeAPIService:
                 item['comment_count'],
                 item['duration']
             )
-            old_hash = db.get_video_hash(item['id'])
             if new_hash != old_hash:
                 updated_videos.append(item['id'])
         return updated_videos
