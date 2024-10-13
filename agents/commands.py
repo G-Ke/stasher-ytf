@@ -68,12 +68,61 @@ class UpdatePlaylistTool:
 
         return result
 
+class UpdateAllPlaylistsTool:
+    name = "UpdateAllPlaylistsTool"
+    description = "This tool updates all playlists associated with the user's account. It updates the metadata and video items as needed."
+
+    def __init__(self, db: Database, youtube_api: YouTubeAPIService):
+        self.db = db
+        self.youtube_api = youtube_api
+    
+    def _run(self) -> dict:
+        result = {
+            "playlists_updated": 0,
+            "videos_updated": 0,
+            "message": []
+        }
+
+        all_playlists = self.youtube_api.get_playlists()
+        total_playlists = len(all_playlists)
+
+        with click.progressbar(length=total_playlists, label='Updating Playlists') as bar:
+            for playlist in all_playlists:
+                playlist_id = playlist['id']
+                playlist_updated = self.youtube_api.update_playlist(self.db, playlist_id)
+                
+                if playlist_updated:
+                    result["playlists_updated"] += 1
+                    message = f"Playlist {playlist_id} metadata has been updated."
+                else:
+                    message = f"No changes detected in playlist {playlist_id} metadata."
+                
+                click.echo(message)  # Print the message in real-time
+
+                updated_videos = self.youtube_api.update_playlist_items(self.db, playlist_id)
+                if updated_videos:
+                    result["videos_updated"] += len(updated_videos)
+                    video_message = f"Updated {len(updated_videos)} videos in playlist {playlist_id}:"
+                    click.echo(video_message)  # Print video update message
+                    for video_id in updated_videos:
+                        video_line = f"  • {video_id}"
+                        click.echo(video_line)  # Print each updated video
+                else:
+                    no_video_message = f"No changes detected in videos for playlist {playlist_id}."
+                    click.echo(no_video_message)  # Print no video changes message
+
+                bar.update(1)  # Update the progress bar
+
+        result["message"].append(f"Total playlists updated: {result['playlists_updated']}")
+        result["message"].append(f"Total videos updated: {result['videos_updated']}")
+        result["message"].append("All playlists update process completed.")
+        return result
+
+
 def update_playlist_command(obj, playlist_id):
     """Function to update a single playlist"""
     db = obj['db']
     youtube_api = obj['youtube_api']
-    # playlist_id = obj['playlist_id']
-    # playlist_id = 'PLvdKPgz0vo-t4AN4AuCj9Fo28Flk5Q8ZM'
     
     playlist_updated = youtube_api.update_playlist(db, playlist_id)
     if playlist_updated:

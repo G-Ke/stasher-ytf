@@ -115,3 +115,14 @@ Based on the code structure and relationships, the following testing plan can be
    - Ensure that appropriate error messages are returned for invalid inputs or missing tools in `command_handlers.py`.
 
 By following this testing plan, we can ensure comprehensive coverage and robustness of the project.
+
+
+---
+
+## Adding a new tool/task flow
+
+1. Create tool in commands
+2. Create tool command handler
+3. Initialize tool in stasher
+4. Regiser command in stasher
+5. Update prompt as needed in stasher `plan_command`

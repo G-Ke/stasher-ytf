@@ -4,10 +4,10 @@ from typing import List, Dict
 
 from litellm import completion
 
-from agents.commands import UpdatePlaylistTool, StashVideoTool
+from agents.commands import UpdatePlaylistTool, UpdateAllPlaylistsTool, StashVideoTool
 from config import load_config
 from database.database import Database
-from agents.command_handlers import update_playlist_handler, stash_video_handler, check_playlist_delta_handler
+from agents.command_handlers import update_playlist_handler, stash_video_handler, check_playlist_delta_handler, update_all_playlists_handler
 from services.youtube_api_service import YouTubeAPIService
 from services.yt_dlp_service import YTDLPService
 
@@ -32,13 +32,15 @@ class Stasher:
         self.db = Database(self.config['database_path'])
         self.yt_dlp_service = YTDLPService()
         update_playlist_tool = UpdatePlaylistTool(self.db, self.youtube_api)
+        update_all_playlists_tool = UpdateAllPlaylistsTool(self.db, self.youtube_api)
         stash_video_tool = StashVideoTool(self.yt_dlp_service)
-        self.tools = [update_playlist_tool, stash_video_tool]
+        self.tools = [update_playlist_tool, stash_video_tool, update_all_playlists_tool]
 
     def register_commands(self):
         self.register_command("update_playlist", update_playlist_handler)
         self.register_command("stash_video", stash_video_handler)
         self.register_command("check_playlist_delta", check_playlist_delta_handler)
+        self.register_command("update_all_playlists", update_all_playlists_handler)
 
     def register_command(self, command_name, handler):
         self.command_registry[command_name] = handler
@@ -47,6 +49,7 @@ class Stasher:
         command_plan = self.plan_command(user_input)
         command = command_plan.get("command")
         parameters = command_plan.get("parameters", {})
+        print(command)
         handler = self.command_registry.get(command)
         if handler:
             result = handler(parameters, self.tools)
@@ -58,8 +61,9 @@ class Stasher:
         prompt = f"""
         Given the user input: "{user_input}"
         Important!: You are the Stasher agent, an AI designed to take in user input and determine the appropriate command and its parameters. The available commands are:
-        Determine the appropriate command and its parameters. The available commands are:
+        Determine the appropriate command and its parameters. Do not add any explanatory reasoning, just provide the JSON. The available commands are:
         1. update_playlist - Updating the playlist metadata for the user, given a playlist (may have to ask for it), and saved to the database.
+        2. update_all_playlists - Updating all playlists for the user's account and saving the metadata to the database. No playlist_id is needed, but you should make sure they want all playlists updated, not just specific ones.
         2. stash_video  - Stashing a video or audio file for the user, given a URL or ID (may have to ask for it), and then saved to the user's storage.
 
         If the user doesn't make their request clear, or it doesn't fall neatly into one of the commands you have access to, the response should be always to remind the user that you are the stasher agent and can only perform limited commands. 
@@ -82,6 +86,15 @@ class Stasher:
                 "video_urls": ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"],
                 "output_path": "downloads",
                 "audio_only": false
+            }}
+        }}
+
+        For example, if the user wants to update all playlists, the response should be:
+        {{
+            "command": "update_all_playlists",
+            "parameters": {{
+                "param1": "value1",
+                "param2": "value2"
             }}
         }}
 

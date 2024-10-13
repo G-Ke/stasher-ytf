@@ -5,7 +5,6 @@ from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
-
 def update_playlist_handler(parameters: Dict, tools: List[callable]) -> str:
     update_playlist_tool = next((tool for tool in tools if tool.name == "UpdatePlaylistTool"), None)
     if update_playlist_tool and 'playlist_id' in parameters:
@@ -18,6 +17,19 @@ def update_playlist_handler(parameters: Dict, tools: List[callable]) -> str:
         return output
     else:
         return "Error: UpdatePlaylistTool not found or playlist_id not provided."
+
+def update_all_playlists_handler(parameters: Dict, tools: List[callable]) -> str:
+    update_all_playlists_tool = next((tool for tool in tools if tool.name == "UpdateAllPlaylistsTool"), None)
+    if update_all_playlists_tool:
+        result = update_all_playlists_tool._run()
+        output = "\n".join(result["message"])
+        if result["playlists_updated"] or result["videos_updated"]:
+            output = click.style(output, fg='green')
+        else:
+            output = click.style(output, fg='yellow')
+        return output
+    else:
+        return "Error: UpdateAllPlaylistsTool not found."
 
 def stash_video_handler(parameters: Dict, tools: List[callable]) -> str:
     logger.info(f"Stash video handler called with parameters: {parameters}")
