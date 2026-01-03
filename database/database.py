@@ -90,9 +90,6 @@ class Database:
             'published_at': published_at.isoformat(),
             'channel_id': channel_id,
             'channel_title': channel_title,
-            'view_count': view_count,
-            'like_count': like_count,
-            'comment_count': comment_count,
             'duration': duration
         }
         content_hash = self.generate_hash(data)

@@ -89,6 +89,7 @@ venv.bak/
 # dotenv
 .env
 .env.*
+.new-venv
 
 # Spyder project settings
 .spyderproject
