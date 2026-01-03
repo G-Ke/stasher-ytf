@@ -49,7 +49,6 @@ class Stasher:
         command_plan = self.plan_command(user_input)
         command = command_plan.get("command")
         parameters = command_plan.get("parameters", {})
-        print(command)
         handler = self.command_registry.get(command)
         if handler:
             result = handler(parameters, self.tools)
@@ -98,7 +97,7 @@ class Stasher:
             }}
         }}
 
-        Ensure that the command name matches exactly one of the available commands. Never return anything else. Just JSON in the schema above.
+        Ensure that the command name matches exactly one of the available commands. Never return anything else except JSON in the schema above.
         """
         
         response = self.get_llm_response(prompt)

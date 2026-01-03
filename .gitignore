@@ -172,3 +172,5 @@ Thumbs.db
 test_client_secret.json
 token.pickle
 content/
+erd.md
+notes.md

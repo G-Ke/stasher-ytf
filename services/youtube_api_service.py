@@ -110,7 +110,7 @@ class YouTubeAPIService:
         request = self.youtube.playlists().list(
             part="snippet",
             mine=True,
-            maxResults=50
+            maxResults=100
         )
         response = request.execute()
         return response['items']
@@ -167,7 +167,7 @@ class YouTubeAPIService:
             playlists_request = self.youtube.playlists().list(
                 part="snippet",
                 channelId=channel['id'],
-                maxResults=50
+                maxResults=200
             )
             while playlists_request:
                 playlists_response = playlists_request.execute()
@@ -225,5 +225,3 @@ class YouTubeAPIService:
         db.update_playlist_last_fetched(playlist_id)
 
         return videos
-
-    # Add more methods as needed
