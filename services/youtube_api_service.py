@@ -107,13 +107,17 @@ class YouTubeAPIService:
         return None
 
     def get_playlists(self):
+        items = []
         request = self.youtube.playlists().list(
             part="snippet",
             mine=True,
-            maxResults=100
+            maxResults=50
         )
-        response = request.execute()
-        return response['items']
+        while request:
+            response = request.execute()
+            items.extend(response['items'])
+            request = self.youtube.playlists().list_next(request, response)
+        return items
 
     def update_playlist(self, db, playlist_id):
         playlist_details = self.get_playlist_details(playlist_id)
