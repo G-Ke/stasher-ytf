@@ -3,6 +3,9 @@ import logging
 import os
 import pickle
 
+import time
+import random
+from googleapiclient.errors import HttpError
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
@@ -11,6 +14,14 @@ from googleapiclient.discovery import build
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+QUOTA_COSTS = {
+    'list': 1,
+    'search': 100,
+    'videos.insert': 1600,
+}
+DAILY_QUOTA_LIMIT = 10000
+QUOTA_WARNING_THRESHOLD = 0.8  # Warn at 80% usage
+
 SCOPES = ['https://www.googleapis.com/auth/youtube.force-ssl']
 
 class YouTubeAPIService:
@@ -18,6 +29,43 @@ class YouTubeAPIService:
         self.client_secrets_file = client_secrets_file
         self.credentials = None
         self.youtube = self.get_authenticated_service()
+        self.quota_usage = 0
+
+    def _execute_request(self, request, cost=1):
+        """
+        Executes an API request with quota tracking and exponential backoff.
+        """
+        # Local Quota Tracking
+        self.quota_usage += cost
+        if self.quota_usage >= DAILY_QUOTA_LIMIT * QUOTA_WARNING_THRESHOLD:
+            logger.warning(f"QUOTA WARNING: Approaching daily limit. Usage: {self.quota_usage}/{DAILY_QUOTA_LIMIT}")
+
+        retries = 0
+        max_retries = 5
+        
+        while True:
+            try:
+                return request.execute()
+            except HttpError as e:
+                if e.resp.status in [403, 429, 500, 503]:
+                    reason = None
+                    try:
+                        reason = e.content.decode('utf-8')
+                    except:
+                        pass
+                    
+                    if e.resp.status == 403 and "quotaExceeded" in str(reason):
+                        logger.error("CRITICAL: YouTube API Quota Exceeded for the day.")
+                        raise e  # Stop immediately, cannot retry
+
+                    if retries < max_retries:
+                        sleep_time = (2 ** retries) + random.uniform(0, 1)
+                        logger.warning(f"Transient error {e.resp.status}. Retrying in {sleep_time:.2f}s...")
+                        time.sleep(sleep_time)
+                        retries += 1
+                        continue
+                
+                raise e  # Re-raise if not retryable or max retries reached
 
     def get_authenticated_service(self):
         if os.path.exists('token.pickle'):
@@ -45,7 +93,7 @@ class YouTubeAPIService:
             part="snippet,contentDetails",
             id=playlist_id
         )
-        response = request.execute()
+        response = self._execute_request(request, cost=QUOTA_COSTS['list'])
 
         if 'items' in response and len(response['items']) > 0:
             playlist = response['items'][0]
@@ -70,7 +118,7 @@ class YouTubeAPIService:
                 maxResults=50,
                 pageToken=next_page_token
             )
-            response = request.execute()
+            response = self._execute_request(request, cost=QUOTA_COSTS['list'])
 
             for item in response['items']:
                 video_id = item['contentDetails']['videoId']
@@ -88,7 +136,7 @@ class YouTubeAPIService:
             part="snippet,contentDetails,statistics",
             id=video_id
         )
-        response = request.execute()
+        response = self._execute_request(request, cost=QUOTA_COSTS['list'])
 
         if 'items' in response and len(response['items']) > 0:
             video = response['items'][0]
@@ -114,7 +162,7 @@ class YouTubeAPIService:
             maxResults=50
         )
         while request:
-            response = request.execute()
+            response = self._execute_request(request, cost=QUOTA_COSTS['list'])
             items.extend(response['items'])
             request = self.youtube.playlists().list_next(request, response)
         return items
@@ -164,7 +212,7 @@ class YouTubeAPIService:
             part="contentDetails",
             mine=True
         )
-        channels_response = channels_request.execute()
+        channels_response = self._execute_request(channels_request, cost=QUOTA_COSTS['list'])
 
         all_playlists = []
         for channel in channels_response['items']:
@@ -174,7 +222,7 @@ class YouTubeAPIService:
                 maxResults=200
             )
             while playlists_request:
-                playlists_response = playlists_request.execute()
+                playlists_response = self._execute_request(playlists_request, cost=QUOTA_COSTS['list'])
                 all_playlists.extend(playlists_response['items'])
                 playlists_request = self.youtube.playlists().list_next(playlists_request, playlists_response)
 
