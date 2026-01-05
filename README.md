@@ -2,7 +2,7 @@
 
 Stasher Agent is a command-line interface and AI Agent for managing and stashing video content metadata. Interact with an LLM in natural language to perform tasks like updating playlist metadata, stashing files, and more.
 
-The tool includes interactive Agent mode, as well standard CLI commands.
+The tool includes interactive Agent mode, as well standard CLI commands. The agent mode can utilize a Together API key or a local model via Ollama.
 
 ***This is a work in progress. It is a tool I use, but there are other tools that may be better options for you.***
 
@@ -65,6 +65,15 @@ To run the CLI, use the following command:
 - **Enter Agent Mode**
 ```bash
 python main.py run-stasher
+
+> update playlist IfEY5_NB6is
+> update all of my playlists please
+> stash video IfEY5_NB6is
+```
+
+- **Enter Agent Mode with Ollama**
+```bash
+python main.py run-stasher-ollama
 
 > update playlist IfEY5_NB6is
 > update all of my playlists please

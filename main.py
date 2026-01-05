@@ -79,5 +79,12 @@ def run_stasher(ctx):
     from stasher_interactive import run_stasher
     run_stasher()
 
+@cli.command()
+@click.pass_context
+def run_stasher_ollama(ctx):
+    """Run the interactive mode with Ollama agent"""
+    from stasher_interactive import run_stasher_ollama
+    run_stasher_ollama()
+
 if __name__ == '__main__':
     cli()
