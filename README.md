@@ -15,6 +15,14 @@ The tool includes interactive Agent mode, as well standard CLI commands. The age
 - Batch stashing data with customizable settings.
 - Store stashed metadata in a sqlite database.
 
+## Prerequisites
+
+- **Python 3.10+**
+- **FFmpeg**: Required for audio processing and format conversion.
+  - Windows: `winget install Gyan.FFmpeg` or download from [ffmpeg.org](https://ffmpeg.org/download.html)
+  - Linux: `sudo apt install ffmpeg`
+  - macOS: `brew install ffmpeg`
+
 ## Installation
 
 1. Clone the repository:
@@ -28,7 +36,13 @@ The tool includes interactive Agent mode, as well standard CLI commands. The age
    pip install -r requirements.txt
    ```
 
-3. Configure your client secrets file as needed.
+3. Configure your environment:
+   - Copy `test_client_secret.json` or your downloaded OAuth credentials to the project root.
+   - Create a `.env` file (optional) to specify the secrets file location:
+     ```env
+     CLIENT_SECRETS_FILE=client_secrets.json
+     ```
+   - (Optional) Customize behavior in `controls.toml`.
 
 ## Usage
 
@@ -36,6 +50,12 @@ To run the CLI, use the following command:
 
 
 ### Commands
+
+- **Authentication**
+  ```bash
+  python main.py auth
+  ```
+  *Initiates the OAuth flow to grant the application access to your YouTube account.*
 
 - **Update a Playlist**
   ```bash
@@ -62,7 +82,8 @@ To run the CLI, use the following command:
   python main.py stash-playlist --playlist-id <PLAYLIST_ID> --output-path <OUTPUT_PATH> [--audio-only] [--batch-size <BATCH_SIZE>] [--batch-delay <BATCH_DELAY>] [--summary-interval <SUMMARY_INTERVAL>]
   ```
 
-- **Enter Agent Mode**
+- **Enter Agent Mode (Cloud)**
+  *Uses TogetherAI (requires API key).*
 ```bash
 python main.py run-stasher
 
@@ -71,7 +92,8 @@ python main.py run-stasher
 > stash video IfEY5_NB6is
 ```
 
-- **Enter Agent Mode with Ollama**
+- **Enter Agent Mode (Local)**
+  *Uses a local Ollama instance (requires Ollama installed and running).*
 ```bash
 python main.py run-stasher-ollama
 
@@ -82,7 +104,13 @@ python main.py run-stasher-ollama
 
 ## Configuration
 
-The application requires a configuration file to load client secrets. Ensure that the `client_secrets_file` is correctly set in your configuration.
+## Configuration
+
+The application uses a hierarchy for configuration:
+1. **Environment Variables**: Defined in `.env` (e.g., `CLIENT_SECRETS_FILE`).
+2. **Configuration File**: `controls.toml` for default settings.
+
+Ensure `client_secrets_file` points to a valid Google OAuth Client ID JSON file.
 
 ## Contributing
 
