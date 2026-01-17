@@ -16,6 +16,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def ensure_authenticated(service, force=False):
+    """
+    Ensures that the YouTube API service is authenticated.
+    If not, it prompts the user for consent before initiating the OAuth flow.
+    """
+    if not force and service.try_load_credentials():
+        return
+
+    click.secho("\nAuthentication Required", fg='yellow', bold=True)
+    click.echo("The application needs to access your YouTube account to manage playlists.")
+    click.echo("This process will:")
+    click.echo("  1. Open a browser window to Google Sign-In.")
+    click.echo("  2. Ask you to authorize the application.")
+    click.echo("  3. Save a 'token.pickle' file locally for future use.")
+    
+    if click.confirm("\nDo you want to proceed?", default=True, abort=True):
+        click.secho("Initiating authentication flow...", fg='green')
+        service.authenticate_interactive()
+        click.secho("Authentication successful!", fg='green')
+
 @click.group()
 @click.pass_context
 def cli(ctx):
@@ -31,16 +52,24 @@ def cli(ctx):
     ctx.obj['yt_dlp_service'] = YTDLPService()
 
 @cli.command()
+@click.pass_context
+def auth(ctx):
+    """Authenticate with YouTube API"""
+    ensure_authenticated(ctx.obj['youtube_api'], force=True)
+
+@cli.command()
 @click.option('--playlist-id', prompt='Enter playlist ID', help='ID of the playlist to update')
 @click.pass_context
 def update_playlist(ctx, playlist_id):
     """Update a single playlist"""
+    ensure_authenticated(ctx.obj['youtube_api'])
     update_playlist_command(ctx.obj, playlist_id)
 
 @cli.command()
 @click.pass_context
 def update_all_playlists(ctx):
     """Update all playlists for a channel"""
+    ensure_authenticated(ctx.obj['youtube_api'])
     update_all_playlists_command(ctx.obj)
 
 @cli.command()
@@ -50,6 +79,7 @@ def update_all_playlists(ctx):
 @click.pass_context
 def stash_video(ctx, video_url, output_path, audio_only):
     """Stash a video or its audio"""
+    ensure_authenticated(ctx.obj['youtube_api'])
     stash_video_command(ctx.obj, video_url, output_path, audio_only)
 
 @cli.command()
@@ -58,6 +88,7 @@ def stash_video(ctx, video_url, output_path, audio_only):
 @click.pass_context
 def check_playlist_delta(ctx, verbose, save):
     """Check for differences between local and remote playlists"""
+    ensure_authenticated(ctx.obj['youtube_api'])
     check_playlist_delta_command(ctx.obj, verbose, save)
 
 @cli.command()
@@ -70,6 +101,7 @@ def check_playlist_delta(ctx, verbose, save):
 @click.pass_context
 def stash_playlist(ctx, playlist_id, output_path, audio_only, batch_size, batch_delay, summary_interval):
     """Stash all videos in a playlist"""
+    ensure_authenticated(ctx.obj['youtube_api'])
     stash_playlist_command(ctx.obj, playlist_id, output_path, audio_only, batch_size, batch_delay, summary_interval)
 
 @cli.command()

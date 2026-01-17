@@ -28,8 +28,58 @@ class YouTubeAPIService:
     def __init__(self, client_secrets_file):
         self.client_secrets_file = client_secrets_file
         self.credentials = None
-        self.youtube = self.get_authenticated_service()
+        self.youtube = None
         self.quota_usage = 0
+
+    def try_load_credentials(self):
+        """
+        Attempts to load existing credentials without user interaction.
+        Returns True if successful, False otherwise.
+        """
+        if os.path.exists('token.pickle'):
+            with open('token.pickle', 'rb') as token:
+                try:
+                    self.credentials = pickle.load(token)
+                except Exception as e:
+                    logger.error(f"Error loading token.pickle: {e}")
+                    self.credentials = None
+
+        if self.credentials and self.credentials.valid:
+            self.youtube = build('youtube', 'v3', credentials=self.credentials, cache_discovery=False)
+            return True
+
+        if self.credentials and self.credentials.expired and self.credentials.refresh_token:
+            try:
+                self.credentials.refresh(Request())
+                self.youtube = build('youtube', 'v3', credentials=self.credentials, cache_discovery=False)
+                # Save refreshed token
+                with open('token.pickle', 'wb') as token:
+                    pickle.dump(self.credentials, token)
+                return True
+            except Exception as e:
+                logger.warning(f"Token refresh failed: {e}")
+                self.credentials = None
+        
+        return False
+
+    def authenticate_interactive(self):
+        """
+        Performs interactive authentication using OAuth flow.
+        """
+        flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, SCOPES)
+        self.credentials = flow.run_local_server(port=0)
+        
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(self.credentials, token)
+            
+        self.youtube = build('youtube', 'v3', credentials=self.credentials, cache_discovery=False)
+
+    def get_service(self):
+        """Returns the authenticated service, raising an error if not authenticated."""
+        if not self.youtube:
+             if not self.try_load_credentials():
+                 raise RuntimeError("YouTube API Service is not authenticated. Please run 'python main.py auth' or ensure credentials are valid.")
+        return self.youtube
 
     def _execute_request(self, request, cost=1):
         """
@@ -67,29 +117,10 @@ class YouTubeAPIService:
                 
                 raise e  # Re-raise if not retryable or max retries reached
 
-    def get_authenticated_service(self):
-        if os.path.exists('token.pickle'):
-            with open('token.pickle', 'rb') as token:
-                self.credentials = pickle.load(token)
 
-        if not self.credentials or not self.credentials.valid:
-            if self.credentials and self.credentials.expired and self.credentials.refresh_token:
-                try:
-                    self.credentials.refresh(Request())
-                except Exception as e:  # Catch any exception during refresh
-                    logger.warning(f"Token refresh failed: {e}. Re-authenticating...")
-                    self.credentials = None  # Reset credentials to force re-authentication
-            if not self.credentials:  # If credentials are None or invalid
-                flow = InstalledAppFlow.from_client_secrets_file(self.client_secrets_file, SCOPES)
-                self.credentials = flow.run_local_server(port=0)
-
-            with open('token.pickle', 'wb') as token:
-                pickle.dump(self.credentials, token)
-
-        return build('youtube', 'v3', credentials=self.credentials, cache_discovery=False)
 
     def get_playlist_details(self, playlist_id):
-        request = self.youtube.playlists().list(
+        request = self.get_service().playlists().list(
             part="snippet,contentDetails",
             id=playlist_id
         )
@@ -112,7 +143,7 @@ class YouTubeAPIService:
         next_page_token = None
 
         while True:
-            request = self.youtube.playlistItems().list(
+            request = self.get_service().playlistItems().list(
                 part="snippet,contentDetails",
                 playlistId=playlist_id,
                 maxResults=50,
@@ -132,7 +163,7 @@ class YouTubeAPIService:
         return items
 
     def get_video_details(self, video_id):
-        request = self.youtube.videos().list(
+        request = self.get_service().videos().list(
             part="snippet,contentDetails,statistics",
             id=video_id
         )
@@ -156,7 +187,7 @@ class YouTubeAPIService:
 
     def get_playlists(self):
         items = []
-        request = self.youtube.playlists().list(
+        request = self.get_service().playlists().list(
             part="snippet",
             mine=True,
             maxResults=50
@@ -164,7 +195,7 @@ class YouTubeAPIService:
         while request:
             response = self._execute_request(request, cost=QUOTA_COSTS['list'])
             items.extend(response['items'])
-            request = self.youtube.playlists().list_next(request, response)
+            request = self.get_service().playlists().list_next(request, response)
         return items
 
     def update_playlist(self, db, playlist_id):
@@ -208,7 +239,7 @@ class YouTubeAPIService:
 
     def get_playlist_delta(self, db):
         # Get all playlists the user has access to
-        channels_request = self.youtube.channels().list(
+        channels_request = self.get_service().channels().list(
             part="contentDetails",
             mine=True
         )
@@ -216,7 +247,7 @@ class YouTubeAPIService:
 
         all_playlists = []
         for channel in channels_response['items']:
-            playlists_request = self.youtube.playlists().list(
+            playlists_request = self.get_service().playlists().list(
                 part="snippet",
                 channelId=channel['id'],
                 maxResults=200
@@ -224,7 +255,7 @@ class YouTubeAPIService:
             while playlists_request:
                 playlists_response = self._execute_request(playlists_request, cost=QUOTA_COSTS['list'])
                 all_playlists.extend(playlists_response['items'])
-                playlists_request = self.youtube.playlists().list_next(playlists_request, playlists_response)
+                playlists_request = self.get_service().playlists().list_next(playlists_request, playlists_response)
 
         # Get all playlists in the database
         db_playlists = db.get_all_playlists()
