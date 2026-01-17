@@ -37,7 +37,7 @@ The tool includes interactive Agent mode, as well standard CLI commands. The age
    ```
 
 3. Configure your environment:
-   - Copy `test_client_secret.json` or your downloaded OAuth credentials to the project root.
+   - Download OAuth credentials from the Google Console and place them in the project root.
    - Create a `.env` file (optional) to specify the secrets file location:
      ```env
      CLIENT_SECRETS_FILE=client_secrets.json
